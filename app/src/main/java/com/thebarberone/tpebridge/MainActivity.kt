@@ -8,8 +8,8 @@ class MainActivity: Activity() {
  super.onCreate(savedInstanceState)
  val prefs=getSharedPreferences("config",MODE_PRIVATE)
  val layout=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(32,36,32,20) }
- val fields=listOf("server" to "URL serveur HTTPS","salon" to "Slug du salon","key" to "Clé du pont","ip" to "IP du TPE","port" to "Port TPE (8888)","pos" to "Numéro de caisse (2)")
- val edits=fields.map { (k,h) -> EditText(this).also { it.hint=h; it.setSingleLine(); it.setText(prefs.getString(k,if(k=="server") "https://app.thebarberone.com" else if(k=="port") "8888" else if(k=="pos") "2" else "")); layout.addView(it) } }
+ val fields=listOf("server" to "URL serveur HTTPS","salon" to "Slug du salon","key" to "Clé du pont","ip" to "IP du TPE","port" to "Port TPE (8888)","pos" to "Numéro de caisse (2)","printerIp" to "IP de l'imprimante réseau","printerPort" to "Port imprimante (9100)")
+ val edits=fields.map { (k,h) -> EditText(this).also { it.hint=h; it.setSingleLine(); it.setText(prefs.getString(k,if(k=="server") "https://app.thebarberone.com" else if(k=="port") "8888" else if(k=="pos") "2" else if(k=="printerPort") "9100" else "")); layout.addView(it) } }
  val status=TextView(this).apply { text="Le pont doit rester actif sur le Wi-Fi du salon."; layout.addView(this) }
  val start=Button(this).apply { text="Enregistrer et démarrer"; layout.addView(this) }
  start.setOnClickListener {
