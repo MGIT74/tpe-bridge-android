@@ -46,11 +46,18 @@ class BridgeService: Service() {
  private fun loop(){
  while(running.get() && !Thread.currentThread().isInterrupted) {
  try {
- // No silent printer driver in v1. Report unsupported printing rather than pretending success.
  val prints=request("/api/tpe/bridge/poll").optJSONArray("jobs")
  if(prints!=null) for(i in 0 until prints.length()) {
  val job=prints.getJSONObject(i)
- request("/api/tpe/bridge/ack",JSONObject().put("job_id",job.getString("id")).put("ok",false).put("error","Impression non disponible dans TPE Bridge Android v1"))
+ val ack=JSONObject().put("job_id",job.getString("id"))
+ try {
+   printTicket(job.getString("text"),job.optString("mode","escpos"))
+   ack.put("ok",true)
+ } catch(e:Exception) {
+   ack.put("ok",false).put("error",e.message ?: "Impression réseau impossible")
+ }
+ // Do not replay a ticket after uncertain ACK: avoid duplicate paper/drawer.
+ try {request("/api/tpe/bridge/ack",ack)}catch(_:Exception){}
  }
  val jobs=request("/api/tpe/bridge/charge-poll").optJSONArray("jobs")
  if(jobs!=null) for(i in 0 until jobs.length()) {
@@ -63,6 +70,32 @@ class BridgeService: Service() {
  }catch(_:Exception){}
  try {Thread.sleep(3000)}catch(_:InterruptedException){break}
  }
+ }
+
+ private fun printTicket(text:String,mode:String) {
+  val prefs=getSharedPreferences("config",MODE_PRIVATE)
+  val host=prefs.getString("printerIp","")!!.trim()
+  val port=prefs.getString("printerPort","9100")!!.toInt()
+  if(host.isEmpty() || port !in 1..65535) throw IOException("IP/port imprimante non configurés")
+  val bytes=when(mode) {
+   "drawer" -> {
+     // The existing server encodes drawer ESC/POS bytes as Latin-1 characters.
+     ByteArray(text.length){i->text[i].code.toByte()}
+   }
+   "text" -> text.toByteArray(Charsets.UTF_8)
+   else -> {
+     val cp850=java.nio.charset.Charset.forName("IBM850")
+     byteArrayOf(0x1B,0x40,0x1B,0x74,0x02) +
+     text.toByteArray(cp850) +
+     byteArrayOf(0x0A,0x0A,0x0A,0x1D,0x56,0x42,0x00)
+   }
+  }
+  Socket().use {socket->
+   socket.connect(InetSocketAddress(host,port),5000)
+   socket.soTimeout=5000
+   socket.getOutputStream().write(bytes)
+   socket.getOutputStream().flush()
+  }
  }
  private fun tlv(tag:String,value:String)=tag+value.length.toString().padStart(3,'0')+value
  private fun charge(amount:Int):JSONObject {
